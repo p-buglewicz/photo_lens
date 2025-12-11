@@ -231,12 +231,14 @@ docker compose up --build
 ### Code Quality Checks
 
 ```bash
-make lint              # Ruff checks
-make format           # Black + ruff formatting
+make lint              # isort + ruff checks
+make format            # isort + Black + ruff formatting
 make typecheck        # Mypy static analysis
 make pre-commit       # Run the full hook suite on all files
 make test             # Run full test suite
 ```
+
+"Agent policy": After making changes, always run `make pre-commit` to enforce hooks (isort, Black, Ruff, basic hygiene). Commit only after hooks succeed.
 
 ### Debugging Database Issues
 

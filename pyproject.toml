@@ -27,6 +27,7 @@ dev = [
     "httpx>=0.25.0",
     "ruff>=0.1.0",
     "black>=23.0.0",
+    "isort>=5.12.0",
     "flake8>=7.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.7.0",
@@ -44,6 +45,14 @@ build-backend = "setuptools.build_meta"
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+py_version = 312
+combine_as_imports = true
+force_single_line = false
+skip = ["alembic", ".venv", ".mypy_cache", ".ruff_cache", "htmlcov", "lensanalytics.egg-info"]
 
 [tool.flake8]
 max-line-length = 100

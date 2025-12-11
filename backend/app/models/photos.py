@@ -1,8 +1,9 @@
 """SQLAlchemy ORM models for LensAnalytics."""
 
-from sqlalchemy import BigInteger, Column, Integer, String, Text, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
+
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.models.base import Base
 

@@ -16,8 +16,8 @@ help:
 	@echo "  make migrate-new        Create new migration (use MESSAGE='description')"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make lint               Run ruff linter"
-	@echo "  make format             Format code with black and ruff"
+	@echo "  make lint               Run ruff + isort checks"
+	@echo "  make format             Format with isort + black + ruff"
 	@echo "  make typecheck          Run mypy static analysis"
 	@echo "  make pre-commit-install Install git hooks (pre-commit)"
 	@echo "  make pre-commit         Run pre-commit on all files"
@@ -72,10 +72,14 @@ migrate-new:
 
 # Code Quality
 lint:
+	@echo "Running isort (check)..."
+	uv run isort . --check-only
 	@echo "Running ruff..."
 	uv run ruff check .
 
 format:
+	@echo "Sorting imports with isort..."
+	uv run isort .
 	@echo "Formatting code with black..."
 	uv run black .
 	@echo "Auto-fixing lint with ruff..."
