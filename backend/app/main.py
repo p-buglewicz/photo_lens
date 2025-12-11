@@ -30,13 +30,13 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
 
     @app.on_event("startup")
-    async def startup_event():
+    async def startup_event() -> None:
         logger.info("🚀 LensAnalytics backend starting up...")
         logger.info(f"Environment: {settings.environment}")
         logger.info(f"Debug mode: {settings.debug}")
 
     @app.on_event("shutdown")
-    async def shutdown_event():
+    async def shutdown_event() -> None:
         logger.info("🛑 LensAnalytics backend shutting down...")
 
     return app

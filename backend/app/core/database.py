@@ -1,10 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from typing import AsyncGenerator
 
 from backend.app.core.config import settings
 
 # Create async engine with connection pooling
-engine = create_async_engine(
+engine: AsyncEngine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     future=True,
@@ -13,7 +14,7 @@ engine = create_async_engine(
 )
 
 # Create async session factory
-AsyncSessionLocal = sessionmaker(
+AsyncSessionLocal = sessionmaker(  # type: ignore[call-overload]
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
@@ -21,7 +22,7 @@ AsyncSessionLocal = sessionmaker(
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session."""
     async with AsyncSessionLocal() as session:
         yield session

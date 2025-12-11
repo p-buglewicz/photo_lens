@@ -22,7 +22,7 @@ class IngestStatus(Base):
     skipped_files = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<IngestStatus batch_id={self.batch_id} status={self.status}>"
 
 
@@ -50,5 +50,5 @@ class Photo(Base):
         Index("idx_photos_embedding", "embedding", postgresql_using="ivfflat"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Photo filename={self.filename} taken_at={self.taken_at}>"
