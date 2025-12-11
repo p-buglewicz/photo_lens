@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +11,20 @@ from backend.app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application lifespan events."""
+    # Startup
+    logger.info("🚀 LensAnalytics backend starting up...")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug mode: {settings.debug}")
+
+    yield
+
+    # Shutdown
+    logger.info("🛑 LensAnalytics backend shutting down...")
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     app = FastAPI(
@@ -15,6 +32,7 @@ def create_app() -> FastAPI:
         description="Self-hosted photo analytics engine with local ML embeddings",
         version="0.1.0",
         debug=settings.debug,
+        lifespan=lifespan,
     )
 
     # Add CORS middleware
@@ -28,16 +46,6 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(health_router)
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        logger.info("🚀 LensAnalytics backend starting up...")
-        logger.info(f"Environment: {settings.environment}")
-        logger.info(f"Debug mode: {settings.debug}")
-
-    @app.on_event("shutdown")
-    async def shutdown_event() -> None:
-        logger.info("🛑 LensAnalytics backend shutting down...")
 
     return app
 
