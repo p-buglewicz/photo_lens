@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: lensanalytics
+      POSTGRES_PASSWORD: lensanalytics_dev
+      POSTGRES_DB: lensanalytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lensanalytics -d lensanalytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lensanalytics_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lensanalytics:lensanalytics_dev@postgres:5432/lensanalytics
+      ENVIRONMENT: development
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - lensanalytics_net
+
+volumes:
+  postgres_data:
+
+networks:
+  lensanalytics_net:
+    driver: bridge

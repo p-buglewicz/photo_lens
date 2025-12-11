@@ -15,6 +15,62 @@ LensAnalytics is a self-hosted photo intelligence platform that ingests your Goo
 | **Storage** | External HDD support |
 | **ML** | Local AI models (privacy-first) |
 
+## Ingestion Quick Start
+
+### Prerequisites
+
+- Docker & Docker Compose
+- Python 3.11+ (for local development)
+- `uv` package manager
+
+### Development Setup
+
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/p-buglewicz/photo_lens.git
+cd photo_lens
+
+# 2. Install dependencies
+make setup
+
+# 3. Install git hooks (recommended)
+uv run pre-commit install
+
+# 4. Start services (postgres + FastAPI)
+make dev-all
+
+# 5. View available commands
+make help
+
+# 6. Check API health
+curl http://localhost:8000/health
+
+# 7. Open API documentation
+open http://localhost:8000/docs
+```
+
+### Common Commands
+
+```bash
+# Database
+make migrate              # Run pending migrations
+make migrate-new MESSAGE="description"
+
+# Code quality
+make lint                 # Ruff checks
+make format               # Black + ruff format
+make typecheck            # Mypy static analysis
+make pre-commit           # Run pre-commit on all files
+make test                # Run tests
+
+# Docker
+make docker-up           # Start containers
+make docker-down         # Stop containers
+make docker-logs         # View logs
+```
+
+See [Makefile](./Makefile) for all available commands.
+
 ## Why Google Takeout?
 
 Google Photos API limitations:
