@@ -123,7 +123,7 @@ This project processes all Takeout files **locally** with **minimal disk space**
 
 ## Development Roadmap
 
-The project is intentionally split into **phases**, each deliverable on its own — ideal for interviews or iterative development.
+The project is intentionally split into **phases**, each delivering incremental value.
 
 ### Phase 1 — Core Infrastructure (MVP)
 
