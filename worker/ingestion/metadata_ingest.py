@@ -5,7 +5,7 @@ import io
 import json
 import logging
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional, Tuple
 from uuid import uuid4
@@ -128,7 +128,7 @@ def _normalize_taken_at(exif_meta: dict, google_meta: dict) -> Optional[datetime
     try:
         ts = google_meta.get("photoTakenTime", {}).get("timestamp")
         if ts:
-            return datetime.utcfromtimestamp(int(ts))
+            return datetime.fromtimestamp(int(ts), tz=timezone.utc)
     except Exception:
         pass
     # Fallback to EXIF DateTimeOriginal formatted like "YYYY:MM:DD HH:MM:SS"
