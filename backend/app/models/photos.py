@@ -2,7 +2,17 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.models.base import Base
@@ -39,16 +49,19 @@ class Photo(Base):
     mime_type = Column(String(100), nullable=True)
     taken_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    exif_metadata = Column(JSONB, nullable=True)
+    # Attribute name cannot be 'metadata' (reserved by SQLAlchemy Base)
+    raw_metadata = Column("metadata", JSONB, nullable=True)
     embedding = Column(JSONB, nullable=True)  # Store embedding as JSONB array
     batch_id = Column(String(255), ForeignKey("ingest_status.batch_id"), nullable=True)
+    # Unique, stable identifier of the source file within a zip archive
+    source_uri = Column(String(512), nullable=True)
 
     # Indexes
     __table_args__ = (
         Index("idx_photos_taken_at", "taken_at"),
         Index("idx_photos_filename", "filename"),
         Index("idx_photos_batch_id", "batch_id"),
-        Index("idx_photos_embedding", "embedding", postgresql_using="ivfflat"),
+        UniqueConstraint("source_uri", name="uq_photos_source_uri"),
     )
 
     def __repr__(self) -> str:

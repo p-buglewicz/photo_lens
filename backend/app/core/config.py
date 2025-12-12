@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # Database
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://lensanalytics:lensanalytics_dev@localhost:5432/lensanalytics",
+        "postgresql+psycopg://lensanalytics:lensanalytics_dev@localhost:5432/lensanalytics",
     )
 
     # Environment

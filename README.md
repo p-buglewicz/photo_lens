@@ -168,6 +168,22 @@ The project is intentionally split into **phases**, each delivering incremental 
   - Writes rows to PostgreSQL
 - Logging & progress reporting
 
+**Usage (Phase 2 worker):**
+
+```bash
+# Install deps
+uv sync
+
+# Run Alembic migrations
+uv run alembic upgrade head
+
+# Process Takeout ZIPs (update TAKEOUT_PATH as needed)
+uv run python worker/run_worker.py --takeout /mnt/photos/Takeout --batch-id $(date -u +"batch-%Y%m%d-%H%M%S")
+
+# Reprocess existing entries (overwrite metadata for same source URIs)
+uv run python worker/run_worker.py --takeout /mnt/photos/Takeout --reprocess --batch-id reprocess-$(date -u +"%Y%m%d-%H%M%S")
+```
+
 **Storage Strategy:**
 
 - No original images saved
@@ -339,4 +355,23 @@ POST /ingest/start
 
 ```bash
 GET /ingest/status
+
+## Local Development (outside Docker)
+
+
+```bash
+# Set up environment
+cp .env.example .env
+# Edit .env for local DB (outside Docker):
+# DATABASE_URL=postgresql+psycopg://lensanalytics:lensanalytics_dev@localhost:5432/lensanalytics
+
+# Install deps
+uv sync
+
+# Run Alembic migrations
+uv run alembic upgrade head
+
+# Start backend
+uv run uvicorn backend.app.main:app --reload
+```
 ```

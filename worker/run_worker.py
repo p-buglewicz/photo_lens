@@ -5,11 +5,11 @@ import asyncio
 import os
 from pathlib import Path
 
-from worker.ingestion.zip_stream import iter_takeout_zip_images
+from worker.ingestion.metadata_ingest import ingest_takeout_metadata
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="LensAnalytics minimal ingestion worker")
+    parser = argparse.ArgumentParser(description="LensAnalytics ingestion worker (Phase 2)")
     parser.add_argument(
         "--takeout",
         type=Path,
@@ -19,8 +19,13 @@ async def main() -> None:
     parser.add_argument(
         "--limit",
         type=int,
-        default=25,
-        help="Maximum number of image names to print (across all ZIPs)",
+        default=None,
+        help="Maximum number of images to process (across all ZIPs)",
+    )
+    parser.add_argument(
+        "--reprocess",
+        action="store_true",
+        help="Reprocess and overwrite existing records for matching source URIs",
     )
     args = parser.parse_args()
 
@@ -30,13 +35,10 @@ async def main() -> None:
     if not takeout_dir.exists() or not takeout_dir.is_dir():
         raise SystemExit(f"Takeout path not found or not a directory: {takeout_dir}")
 
-    printed = 0
-    async for name in iter_takeout_zip_images(takeout_dir, limit=limit):
-        print(name)
-        printed += 1
-
-    if printed == 0:
-        print("No images found in ZIPs. Ensure Takeout ZIPs exist in the directory.")
+    batch_id, processed = await ingest_takeout_metadata(
+        takeout_dir, batch_id=None, limit=limit, reprocess=args.reprocess
+    )
+    print(f"Processed {processed} images in batch {batch_id}.")
 
 
 if __name__ == "__main__":

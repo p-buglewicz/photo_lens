@@ -1,8 +1,7 @@
-"""Alembic environment configuration."""
+"""Alembic environment configuration (synchronous)."""
 
-import asyncio
 from logging.config import fileConfig
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 from alembic import context  # type: ignore[attr-defined]
 import os
@@ -21,8 +20,18 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set sqlalchemy.url from environment
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg", ""))
+
+def _normalize_sync_url(url: str) -> str:
+    """Ensure we use a synchronous driver for Alembic migrations."""
+    if "+asyncpg" in url:
+        return url.replace("+asyncpg", "+psycopg")
+    if url.startswith("postgresql.asyncpg://"):
+        return url.replace("postgresql.asyncpg://", "postgresql+psycopg://", 1)
+    return url
+
+
+# Set sqlalchemy.url from environment (force sync driver)
+config.set_main_option("sqlalchemy.url", _normalize_sync_url(settings.database_url))
 
 # add your model's MetaData object here
 target_metadata = Base.metadata
@@ -49,24 +58,22 @@ def do_run_migrations(connection: object) -> None:
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode (sync engine)."""
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.database_url
+    configuration["sqlalchemy.url"] = _normalize_sync_url(settings.database_url)
 
-    connectable = create_async_engine(
-        settings.database_url,
+    connectable = create_engine(
+        _normalize_sync_url(settings.database_url),
         echo=False,
         poolclass=NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()
