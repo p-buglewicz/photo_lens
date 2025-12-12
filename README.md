@@ -9,6 +9,7 @@ LensAnalytics is a self-hosted photo intelligence platform that ingests your Goo
 | Component | Technology |
 |-----------|-----------|
 | **Backend** | FastAPI (Python) |
+| **Frontend** | Vue 3 + Nginx (static) |
 | **Workers** | Python (ingestion & ML) |
 | **Database** | PostgreSQL + pgvector |
 | **Deployment** | Docker Compose |
@@ -67,6 +68,10 @@ make test                # Run tests
 make docker-up           # Start containers
 make docker-down         # Stop containers
 make docker-logs         # View logs
+make docker-frontend-logs # Frontend container logs (nginx + Vue static)
+make docker-backend-logs  # Backend container logs
+make docker-ps            # Running containers summary
+make docker-restart       # Restart backend + frontend containers
 
 # Worker (Phase 1)
 make worker              # Print first N image names from Takeout ZIPs
@@ -288,6 +293,9 @@ lensanalytics/
 │   │   ├── services/
 │   │   └── main.py
 │   └── Dockerfile
+├── frontend/
+│   ├── Dockerfile
+│   └── static/
 ├── worker/
 │   ├── run_worker.py
 │   ├── ingestion/
@@ -355,9 +363,15 @@ POST /ingest/start
 
 ```bash
 GET /ingest/status
+```
+
+### 5. Open the frontend (Vue)
+
+```text
+http://localhost:8080
+```
 
 ## Local Development (outside Docker)
-
 
 ```bash
 # Set up environment
@@ -374,4 +388,10 @@ uv run alembic upgrade head
 # Start backend
 uv run uvicorn backend.app.main:app --reload
 ```
-```
+
+## Frontend UI
+
+- Served by the `frontend` service in [docker-compose.yml](docker-compose.yml) using Nginx to host the static Vue app from [frontend/static/index.html](frontend/static/index.html).
+- Accessible on the host at [http://localhost:8080](http://localhost:8080) (container port 80).
+- The UI calls the backend exposed on [http://localhost:8001](http://localhost:8001) when accessed from the host; inside the compose network it talks to the `backend` service directly.
+- Useful helpers: `make docker-frontend-logs`, `make docker-backend-logs`, and `make docker-ps` for quick inspection.

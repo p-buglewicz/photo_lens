@@ -34,6 +34,13 @@ RUN apt-get update && apt-get install -y \
 # Copy venv from builder
 COPY --from=builder /app/.venv /app/.venv
 
+# Copy application code (including static assets)
+COPY --from=builder /app/backend /app/backend
+COPY --from=builder /app/worker /app/worker
+COPY --from=builder /app/alembic /app/alembic
+COPY --from=builder /app/alembic.ini /app/alembic.ini
+COPY --from=builder /app/pyproject.toml /app/pyproject.toml
+
 # Set PATH to use venv
 ENV PATH="/app/.venv/bin:$PATH"
 

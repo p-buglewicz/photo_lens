@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LensAnalytics Ingestion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        :root {
+            --bg: #0a1826;
+            --card: #0f2536;
+            --accent: #1ad1a5;
+            --accent-strong: #12b48c;
+            --muted: #9fb3c8;
+            --text: #eaf4ff;
+            --border: #143047;
+            --error: #ff6b6b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 15% 20%, rgba(26, 209, 165, 0.1), transparent 25%),
+                radial-gradient(circle at 85% 10%, rgba(32, 125, 255, 0.12), transparent 28%),
+                linear-gradient(135deg, #07111b 0%, #0a1a2b 50%, #0d2234 100%);
+            font-family: "Manrope", "Helvetica Neue", "Segoe UI", sans-serif;
+            color: var(--text);
+            padding: 24px;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, rgba(15, 37, 54, 0.9), rgba(12, 28, 42, 0.95));
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35);
+            padding: 24px;
+            backdrop-filter: blur(6px);
+            animation: float-in 420ms ease-out;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(26, 209, 165, 0.14);
+            color: var(--accent);
+            border: 1px solid rgba(26, 209, 165, 0.25);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        h1 {
+            margin: 14px 0 8px;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        p {
+            margin: 0 0 20px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+            color: #041016;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 18px;
+            cursor: pointer;
+            box-shadow: 0 12px 30px rgba(26, 209, 165, 0.35);
+            transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            filter: grayscale(35%);
+            opacity: 0.75;
+            box-shadow: none;
+        }
+
+        button:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 36px rgba(26, 209, 165, 0.38);
+        }
+
+        .batch {
+            color: var(--muted);
+            font-size: 13px;
+            border: 1px dashed var(--border);
+            padding: 8px 12px;
+            border-radius: 10px;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 14px 0 10px;
+        }
+
+        .label {
+            color: var(--muted);
+            font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+
+        .value {
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .bar-shell {
+            width: 100%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #1ad1a5, #21b1ff);
+            transition: width 260ms ease;
+        }
+
+        .bar-fill.done {
+            background: linear-gradient(90deg, #5ee39c, #1ad1a5);
+        }
+
+        .bar-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .callout {
+            margin-top: 14px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .callout.error {
+            border-color: rgba(255, 107, 107, 0.4);
+            color: var(--error);
+            background: rgba(255, 107, 107, 0.08);
+        }
+
+        @keyframes float-in {
+            from {
+                transform: translateY(6px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .batch {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="card">
+            <div class="pill">LensAnalytics</div>
+            <h1>Ingest Google Takeout</h1>
+            <p>Start the ingestion worker and watch its progress in real time.</p>
+
+            <div class="controls">
+                <button :disabled="loading" @click="startIngestion">
+                    {{ loading ? "Starting..." : "Start ingestion" }}
+                </button>
+                <div class="batch" v-if="batchId">Batch {{ batchId }}</div>
+            </div>
+
+            <div class="status-row">
+                <span class="label">Status</span>
+                <span class="value">{{ statusText }}</span>
+            </div>
+
+            <div class="bar-shell" aria-label="Ingestion progress">
+                <div class="bar-fill" :class="{ done: isDone }" :style="{ width: progressWidth }"></div>
+            </div>
+
+            <div class="bar-meta">
+                <span>{{ processedText }}</span>
+                <span>{{ progressPercent }}%</span>
+            </div>
+
+            <div class="callout" v-if="info">{{ info }}</div>
+            <div class="callout error" v-if="error">{{ error }}</div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    apiBase: this.resolveApiBase?.() || "",
+                    loading: false,
+                    error: null,
+                    info: "",
+                    batchId: null,
+                    statusText: "Idle",
+                    processed: 0,
+                    total: null,
+                    poller: null,
+                };
+            },
+            computed: {
+                progressPercent() {
+                    if (this.total && this.total > 0) {
+                        const pct = Math.round((this.processed / this.total) * 100);
+                        return Math.min(Math.max(pct, 0), 100);
+                    }
+                    return 0;
+                },
+                progressWidth() {
+                    return `${this.progressPercent}%`;
+                },
+                processedText() {
+                    if (this.total && this.total > 0) {
+                        return `${this.processed} of ${this.total} files`;
+                    }
+                    return `${this.processed} files processed`;
+                },
+                isDone() {
+                    return this.statusText === "completed";
+                },
+            },
+            methods: {
+                resolveApiBase() {
+                    const explicit = window.API_BASE || window.__API_BASE__;
+                    if (explicit) return explicit.replace(/\/$/, "");
+
+                    const { hostname, port, protocol } = window.location;
+
+                    // In docker-compose we often hit frontend at 8080; backend is published on 8001
+                    if ((hostname === "localhost" || hostname === "127.0.0.1") && (port === "8080" || port === "80")) {
+                        return `${protocol}//${hostname}:8001`;
+                    }
+
+                    // Fallback: same origin
+                    return window.location.origin;
+                },
+                async startIngestion() {
+                    this.loading = true;
+                    this.error = null;
+                    this.info = "Triggering ingestion...";
+
+                    try {
+                        const response = await fetch(`${this.apiBase}/ingest/start`, { method: "POST" });
+                        if (!response.ok) {
+                            const detail = await response.text();
+                            throw new Error(detail || "Failed to start ingestion");
+                        }
+
+                        const data = await response.json();
+                        this.batchId = data.batch_id;
+                        this.statusText = data.status || "started";
+                        this.info = "Ingestion started.";
+                        this.startPolling();
+                        await this.refreshStatus();
+                    } catch (err) {
+                        this.error = err?.message || "Unable to start ingestion.";
+                        this.info = "";
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                startPolling() {
+                    if (this.poller) {
+                        clearInterval(this.poller);
+                    }
+                    this.poller = setInterval(this.refreshStatus, 2000);
+                },
+                stopPolling() {
+                    if (this.poller) {
+                        clearInterval(this.poller);
+                        this.poller = null;
+                    }
+                },
+                async refreshStatus() {
+                    try {
+                        const response = await fetch(`${this.apiBase}/ingest/status?limit=1`);
+                        if (!response.ok) {
+                            throw new Error("Unable to fetch status");
+                        }
+
+                        const payload = await response.json();
+                        const latest = payload.items?.[0];
+
+                        if (!latest) {
+                            this.statusText = "waiting";
+                            this.info = "No ingestion batches found yet.";
+                            return;
+                        }
+
+                        this.batchId = this.batchId || latest.batch_id;
+                        this.statusText = latest.status || "unknown";
+                        this.processed = latest.processed_files || 0;
+                        this.total = latest.total_files ?? null;
+                        this.info = latest.completed_at ? "Ingestion finished." : "Ingestion running...";
+
+                        if (this.statusText === "failed") {
+                            this.error = latest.error_message || "Ingestion failed.";
+                            this.stopPolling();
+                        }
+
+                        if (this.statusText === "completed") {
+                            this.stopPolling();
+                        }
+                    } catch (err) {
+                        this.error = err?.message || "Unable to read status.";
+                        this.stopPolling();
+                    }
+                },
+            },
+            mounted() {
+                this.refreshStatus();
+                this.startPolling();
+            },
+            unmounted() {
+                this.stopPolling();
+            },
+        }).mount("#app");
+    </script>
+</body>
+
+</html>

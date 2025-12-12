@@ -1,4 +1,4 @@
-.PHONY: help setup dev migrate test lint format typecheck pre-commit-install pre-commit docker-build docker-up docker-down docker-logs clean worker
+.PHONY: help setup dev migrate test lint format typecheck pre-commit-install pre-commit docker-build docker-up docker-down docker-logs docker-ps docker-restart docker-backend-logs docker-frontend-logs clean worker
 
 help:
 	@echo "LensAnalytics Development Commands"
@@ -28,7 +28,11 @@ help:
 	@echo "  make docker-build       Build Docker images"
 	@echo "  make docker-up          Start containers (docker compose up)"
 	@echo "  make docker-down        Stop containers"
-	@echo "  make docker-logs        View container logs"
+	@echo "  make docker-logs        View all container logs"
+	@echo "  make docker-backend-logs View backend logs"
+	@echo "  make docker-frontend-logs View frontend logs"
+	@echo "  make docker-ps          List running containers"
+	@echo "  make docker-restart     Restart backend + frontend containers"
 	@echo "  make docker-clean       Remove containers and volumes"
 	@echo ""
 	@echo "Utilities:"
@@ -122,6 +126,22 @@ docker-down:
 docker-logs:
 	@echo "Tailing logs..."
 	docker compose logs -f
+
+docker-backend-logs:
+	@echo "Tailing backend logs..."
+	docker compose logs -f backend
+
+docker-frontend-logs:
+	@echo "Tailing frontend logs..."
+	docker compose logs -f frontend
+
+docker-ps:
+	@echo "Listing containers..."
+	docker compose ps
+
+docker-restart:
+	@echo "Restarting backend and frontend containers..."
+	docker compose restart backend frontend
 
 docker-clean:
 	@echo "Removing containers and volumes..."
