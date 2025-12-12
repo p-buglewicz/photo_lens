@@ -1,0 +1,18 @@
+{
+  "name": "lensanalytics-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint \"static/**/*.js\"",
+    "lint:fix": "eslint \"static/**/*.js\" --fix",
+    "format": "prettier \"static/**/*.{html,js,css}\" --check",
+    "format:fix": "prettier \"static/**/*.{html,js,css}\" --write"
+  },
+  "devDependencies": {
+    "eslint": "^9.11.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-html": "^8.0.0",
+    "prettier": "^3.3.3"
+  }
+}

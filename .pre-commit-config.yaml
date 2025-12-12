@@ -49,3 +49,19 @@ repos:
           - fastapi>=0.104
           - asyncpg>=0.29
           - "psycopg[binary]>=3.1"
+
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: frontend eslint
+        language: system
+        entry: bash -c 'cd frontend && npm run lint'
+        pass_filenames: false
+        types: [javascript]
+
+      - id: frontend-prettier
+        name: frontend prettier
+        language: system
+        entry: bash -c 'cd frontend && npm run format:fix'
+        pass_filenames: false
+        files: ^frontend/static/.*\.(js|html|css)$
