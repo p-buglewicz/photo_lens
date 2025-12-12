@@ -26,6 +26,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://lensanalytics:lensanalytics_dev@postgres:5432/lensanalytics
       ENVIRONMENT: development
+      TAKEOUT_PATH: /photos
+      THUMBNAIL_CACHE: ${THUMBNAIL_CACHE:-/mnt/photos/thumbnails}
     ports:
       - "8001:8000"
     depends_on:
@@ -34,6 +36,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./worker:/app/worker
+      - ${HOST_PHOTO_PATH}:/photos:ro
     command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - lensanalytics_net

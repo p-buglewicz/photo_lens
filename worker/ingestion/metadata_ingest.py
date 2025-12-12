@@ -15,6 +15,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import AsyncSessionLocal
+from backend.app.core.events import broadcast_event
 from backend.app.models.photos import IngestStatus, Photo
 
 logger = logging.getLogger(__name__)
@@ -261,6 +262,16 @@ async def _process_single_photo(
                         update(Photo).where(Photo.id == existing.id).values(**photo_values)
                     )
                     await session.commit()
+
+                    # Broadcast event for WebSocket clients
+                    await broadcast_event(
+                        {
+                            "type": "file_processed",
+                            "filename": item["filename"],
+                            "batch_id": batch_id,
+                        }
+                    )
+
                     return True, False
                 else:
                     logger.debug(f"Skipping {item['filename']} (already ingested)")
@@ -272,6 +283,16 @@ async def _process_single_photo(
                 photo = Photo(**photo_values)
                 session.add(photo)
                 await session.commit()
+
+                # Broadcast event for WebSocket clients
+                await broadcast_event(
+                    {
+                        "type": "file_processed",
+                        "filename": item["filename"],
+                        "batch_id": batch_id,
+                    }
+                )
+
                 return True, False
         except Exception as exc:
             logger.error(f"Failed to process {item.get('filename')}: {exc}")

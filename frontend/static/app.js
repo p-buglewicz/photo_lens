@@ -12,25 +12,15 @@ createApp({
       processed: 0,
       total: null,
       poller: null,
+      recentFiles: [], // Array of {name, timestamp} for animation
+      websocket: null,
+      ingestConfig: {
+        limit: null,
+        reprocess: false,
+      },
     };
   },
   computed: {
-    progressPercent() {
-      if (this.total && this.total > 0) {
-        const pct = Math.round((this.processed / this.total) * 100);
-        return Math.min(Math.max(pct, 0), 100);
-      }
-      return 0;
-    },
-    progressWidth() {
-      return `${this.progressPercent}%`;
-    },
-    processedText() {
-      if (this.total && this.total > 0) {
-        return `${this.processed} of ${this.total} files`;
-      }
-      return `${this.processed} files processed`;
-    },
     isDone() {
       return this.statusText === "completed";
     },
@@ -53,13 +43,63 @@ createApp({
       // Fallback: same origin
       return window.location.origin;
     },
+    connectWebSocket() {
+      const wsProtocol = this.apiBase.startsWith("https") ? "wss" : "ws";
+      const wsBase = this.apiBase.replace(/^https?:\/\//, "");
+      const wsUrl = `${wsProtocol}://${wsBase}/ws/ingest/progress`;
+
+      this.websocket = new WebSocket(wsUrl);
+
+      this.websocket.onopen = () => {
+        console.log("✅ WebSocket connected");
+      };
+
+      this.websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "file_processed") {
+          this.recentFiles.unshift({
+            name: data.filename,
+            timestamp: Date.now(),
+          });
+          if (this.recentFiles.length > 10) {
+            this.recentFiles = this.recentFiles.slice(0, 10);
+          }
+        }
+      };
+
+      this.websocket.onerror = (error) => {
+        console.error("❌ WebSocket error:", error);
+      };
+
+      this.websocket.onclose = () => {
+        // Always reconnect after 2 seconds
+        setTimeout(() => this.connectWebSocket(), 2000);
+      };
+    },
+    disconnectWebSocket() {
+      if (this.websocket) {
+        this.websocket.close();
+        this.websocket = null;
+      }
+    },
     async startIngestion() {
       this.loading = true;
       this.error = null;
       this.info = "Triggering ingestion...";
 
       try {
-        const response = await fetch(`${this.apiBase}/ingest/start`, { method: "POST" });
+        const params = new URLSearchParams();
+        if (this.ingestConfig.limit !== null && this.ingestConfig.limit !== "") {
+          params.append("limit", this.ingestConfig.limit);
+        }
+        if (this.ingestConfig.reprocess !== null) {
+          params.append("reprocess", this.ingestConfig.reprocess ? "true" : "false");
+        }
+
+        const qs = params.toString();
+        const url = qs ? `${this.apiBase}/ingest/start?${qs}` : `${this.apiBase}/ingest/start`;
+        const response = await fetch(url, { method: "POST" });
         if (!response.ok) {
           const detail = await response.text();
           throw new Error(detail || "Failed to start ingestion");
@@ -69,6 +109,7 @@ createApp({
         this.batchId = data.batch_id;
         this.statusText = data.status || "started";
         this.info = "Ingestion started.";
+        this.recentFiles = []; // Clear previous run
         this.startPolling();
         await this.refreshStatus();
       } catch (err) {
@@ -127,10 +168,12 @@ createApp({
     },
   },
   mounted() {
+    this.connectWebSocket();
     this.refreshStatus();
     this.startPolling();
   },
   unmounted() {
     this.stopPolling();
+    this.disconnectWebSocket();
   },
 }).mount("#app");

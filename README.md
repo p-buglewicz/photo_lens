@@ -31,23 +31,34 @@ LensAnalytics is a self-hosted photo intelligence platform that ingests your Goo
 git clone https://github.com/p-buglewicz/photo_lens.git
 cd photo_lens
 
-# 2. Install dependencies
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and set HOST_PHOTO_PATH to your Takeout directory:
+# HOST_PHOTO_PATH=/path/to/your/photos
+
+# 3. Docker Desktop: Share the photo path
+# Open Docker Desktop → Settings → Resources → File Sharing
+# Add the directory containing your photos (e.g., /media, /mnt, or parent of HOST_PHOTO_PATH)
+# This is required for Docker to access external drives/paths
+# On Linux with Docker Engine, paths are usually accessible by default
+
+# 4. Install dependencies (for local dev)
 make setup
 
-# 3. Install git hooks (recommended)
+# 5. Install git hooks (recommended)
 uv run pre-commit install
 
-# 4. Start services (postgres + FastAPI)
-make dev-all
+# 6. Start services (postgres + backend + frontend)
+docker compose up --build
 
-# 5. View available commands
-make help
+# 7. Open the web UI
+open http://localhost:8080
 
-# 6. Check API health
-curl http://localhost:8000/health
+# 8. Check API health
+curl http://localhost:8001/health
 
-# 7. Open API documentation
-open http://localhost:8000/docs
+# 9. API documentation
+open http://localhost:8001/docs
 ```
 
 ### Common Commands

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.health import router as health_router
 from backend.app.api.ingest import router as ingest_router
+from backend.app.api.websocket import router as websocket_router
 from backend.app.core import settings
 from backend.app.core.logging import get_logger
 
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health_router)
     app.include_router(ingest_router)
+    app.include_router(websocket_router)
 
     return app
 
