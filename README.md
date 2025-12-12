@@ -67,6 +67,14 @@ make test                # Run tests
 make docker-up           # Start containers
 make docker-down         # Stop containers
 make docker-logs         # View logs
+
+# Worker (Phase 1)
+make worker              # Print first N image names from Takeout ZIPs
+
+# Direct (module execution from project root)
+uv run python -m worker.run_worker --takeout /path/to/Takeout --limit 20
+
+Note: This Phase 1 CLI is temporary. In Phase 2 the ingestion will run as a background worker with API triggers (usage will change).
 ```
 
 See [Makefile](./Makefile) for all available commands.

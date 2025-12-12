@@ -1,4 +1,4 @@
-.PHONY: help setup dev migrate test lint format typecheck pre-commit-install pre-commit docker-build docker-up docker-down docker-logs clean
+.PHONY: help setup dev migrate test lint format typecheck pre-commit-install pre-commit docker-build docker-up docker-down docker-logs clean worker
 
 help:
 	@echo "LensAnalytics Development Commands"
@@ -34,6 +34,7 @@ help:
 	@echo "Utilities:"
 	@echo "  make clean              Remove cache files and build artifacts"
 	@echo "  make health             Check API health endpoint"
+	@echo "  make worker             Run minimal ingestion worker (prints photo names)"
 
 # Setup & Development
 setup:
@@ -87,7 +88,7 @@ format:
 
 typecheck:
 	@echo "Running mypy..."
-	uv run mypy backend
+	uv run mypy -p backend -p worker
 
 pre-commit-install:
 	@echo "Installing pre-commit hooks..."
@@ -143,3 +144,7 @@ clean:
 health:
 	@echo "Checking API health..."
 	curl -s http://localhost:8000/health | python -m json.tool || echo "API not responding"
+
+worker:
+	@echo "Running minimal ingestion worker (module execution)..."
+	uv run python -m worker.run_worker --takeout "$${TAKEOUT:-$$(grep -E '^TAKEOUT_PATH=' .env 2>/dev/null | cut -d'=' -f2)}" --limit "$${LIMIT:-25}"
