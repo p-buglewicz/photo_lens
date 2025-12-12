@@ -219,6 +219,76 @@ async def _get_or_create_batch(session: AsyncSession, batch_id: Optional[str]) -
     return status
 
 
+async def _process_single_photo(
+    item: dict,
+    batch_id: str,
+    reprocess: bool,
+) -> Tuple[bool, bool]:
+    """Process a single photo metadata entry.
+
+    Returns (was_processed, was_skipped) tuple.
+    Uses its own database session for isolation.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            # Upsert by source_uri for idempotency
+            stmt = select(Photo).where(Photo.source_uri == item["source_uri"])
+            existing = (await session.execute(stmt)).scalar_one_or_none()
+
+            # Ensure all nested metadata is JSON-serializable for JSONB storage
+            raw_metadata = {
+                "exif": _make_json_serializable(item["exif"]),
+                "google": _make_json_serializable(item["google_json"]),
+            }
+
+            photo_values = {
+                "google_id": None,
+                "filename": item["filename"],
+                "file_size": item["file_size"],
+                "mime_type": item["mime_type"],
+                "taken_at": item["taken_at"],
+                "raw_metadata": raw_metadata,
+                "batch_id": batch_id,
+                "source_uri": item["source_uri"],
+            }
+
+            if existing:
+                if reprocess:
+                    logger.debug(
+                        f"Reprocessing {item['filename']} (source_uri={item['source_uri']})"
+                    )
+                    await session.execute(
+                        update(Photo).where(Photo.id == existing.id).values(**photo_values)
+                    )
+                    await session.commit()
+                    return True, False
+                else:
+                    logger.debug(f"Skipping {item['filename']} (already ingested)")
+                    return False, True
+            else:
+                logger.info(
+                    f"✓ {item['filename']} (size={item['file_size']}, taken={item['taken_at']})"
+                )
+                photo = Photo(**photo_values)
+                session.add(photo)
+                await session.commit()
+                return True, False
+        except Exception as exc:
+            logger.error(f"Failed to process {item.get('filename')}: {exc}")
+            return False, False
+
+
+async def _update_batch_progress(batch_id: str, processed: int, skipped: int) -> None:
+    """Update batch status progress counter."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            update(IngestStatus)
+            .where(IngestStatus.batch_id == batch_id)
+            .values(processed_files=processed, skipped_files=skipped)
+        )
+        await session.commit()
+
+
 async def ingest_takeout_metadata(
     takeout_dir: Path,
     batch_id: Optional[str] = None,
@@ -227,69 +297,83 @@ async def ingest_takeout_metadata(
 ) -> Tuple[str, int]:
     """Process Takeout ZIPs and persist normalized metadata into the database.
 
+    Processes photos asynchronously with controlled concurrency.
     Returns the number of processed images.
     """
     logger.info(
         f"Starting ingestion: takeout_dir={takeout_dir}, limit={limit}, reprocess={reprocess}"
     )
+
+    # Create batch status record
     async with AsyncSessionLocal() as session:
         status = await _get_or_create_batch(session, batch_id)
-        logger.info(f"Using batch_id={status.batch_id}, status={status.status}")
-        processed = 0
-        skipped = 0
-        try:
-            async for item in stream_zip_metadata(takeout_dir, limit=limit):
-                # Upsert by source_uri for idempotency
-                stmt = select(Photo).where(Photo.source_uri == item["source_uri"])
-                existing = (await session.execute(stmt)).scalar_one_or_none()
+        actual_batch_id: str = status.batch_id  # type: ignore[assignment]
+        await session.commit()
+        logger.info(f"Using batch_id={actual_batch_id}, status={status.status}")
 
-                # Ensure all nested metadata is JSON-serializable for JSONB storage
-                raw_metadata = {
-                    "exif": _make_json_serializable(item["exif"]),
-                    "google": _make_json_serializable(item["google_json"]),
-                }
+    processed = 0
+    skipped = 0
+    semaphore = asyncio.Semaphore(10)  # Max 10 concurrent photo processors
 
-                photo_values = {
-                    "google_id": None,
-                    "filename": item["filename"],
-                    "file_size": item["file_size"],
-                    "mime_type": item["mime_type"],
-                    "taken_at": item["taken_at"],
-                    "raw_metadata": raw_metadata,
-                    "batch_id": batch_id,
-                    "source_uri": item["source_uri"],
-                }
+    try:
+        # Collect metadata items in batches for async processing
+        batch = []
+        batch_size = 20
 
-                if existing:
-                    if reprocess:
-                        logger.debug(
-                            f"Reprocessing {item['filename']} (source_uri={item['source_uri']})"
-                        )
-                        await session.execute(
-                            update(Photo).where(Photo.id == existing.id).values(**photo_values)
-                        )
+        async for item in stream_zip_metadata(takeout_dir, limit=limit):
+            batch.append(item)
+
+            if len(batch) >= batch_size:
+                # Process batch concurrently
+                async def process_with_semaphore(photo_item: dict) -> Tuple[bool, bool]:
+                    async with semaphore:
+                        return await _process_single_photo(photo_item, actual_batch_id, reprocess)
+
+                results = await asyncio.gather(
+                    *[process_with_semaphore(photo) for photo in batch], return_exceptions=True
+                )
+
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Photo processing error: {result}")
+                    elif isinstance(result, tuple):
+                        was_processed, was_skipped = result
+                        if was_processed:
+                            processed += 1
+                        if was_skipped:
+                            skipped += 1
+
+                # Update progress
+                await _update_batch_progress(actual_batch_id, processed, skipped)
+                logger.info(f"Progress: {processed} processed, {skipped} skipped")
+                batch = []
+
+        # Process remaining items
+        if batch:
+
+            async def process_with_semaphore(photo_item: dict) -> Tuple[bool, bool]:
+                async with semaphore:
+                    return await _process_single_photo(photo_item, actual_batch_id, reprocess)
+
+            results = await asyncio.gather(
+                *[process_with_semaphore(photo) for photo in batch], return_exceptions=True
+            )
+
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Photo processing error: {result}")
+                elif isinstance(result, tuple):
+                    was_processed, was_skipped = result
+                    if was_processed:
                         processed += 1
-                    else:
-                        logger.debug(f"Skipping {item['filename']} (already ingested)")
+                    if was_skipped:
                         skipped += 1
-                        continue
-                else:
-                    logger.debug(
-                        f"Inserting {item['filename']} (size={item['file_size']}, taken={item['taken_at']})"
-                    )
-                    photo = Photo(**photo_values)
-                    session.add(photo)
-                    processed += 1
 
-                # Periodically flush to avoid large transactions
-                if processed % 100 == 0:
-                    await session.flush()
-                    logger.info(f"Progress: {processed} processed, {skipped} skipped")
-
-            # Update batch status via SQL to avoid typing issues
+        # Mark batch as completed
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(IngestStatus)
-                .where(IngestStatus.id == status.id)
+                .where(IngestStatus.batch_id == actual_batch_id)
                 .values(
                     processed_files=processed,
                     skipped_files=skipped,
@@ -298,16 +382,19 @@ async def ingest_takeout_metadata(
                 )
             )
             await session.commit()
-            logger.info(
-                f"Ingestion completed: batch_id={status.batch_id}, processed={processed}, skipped={skipped}"
-            )
-            return str(status.batch_id), processed
-        except Exception as exc:
-            logger.error(f"Ingestion failed: {exc}", exc_info=True)
+
+        logger.info(
+            f"Ingestion completed: batch_id={actual_batch_id}, processed={processed}, skipped={skipped}"
+        )
+        return actual_batch_id, processed
+
+    except Exception as exc:
+        logger.error(f"Ingestion failed: {exc}", exc_info=True)
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(IngestStatus)
-                .where(IngestStatus.id == status.id)
+                .where(IngestStatus.batch_id == actual_batch_id)
                 .values(status="error", error_message=str(exc))
             )
             await session.commit()
-            raise
+        raise
